@@ -1,0 +1,78 @@
+#!/usr/bin/python
+
+import os
+import sys
+import subprocess
+
+sys.path.insert(0, os.getenv("GITPYTHONLIB","/Users/trey/homebrew/Cellar/git/1.8.2/lib/python2.7/site-packages"))
+
+from git_remote_helpers import util
+from git_remote_helpers.util import die, debug, warn
+
+class GitCallError(Exception):
+  pass
+
+# #!/bin/zsh
+# for k in $(git branch | sed 's/^..//'); do echo -e `git log -1 --pretty=format:"%Cgreen%ci %Cblue%cr%Creset" $k --`\\t"$k";done | sort -r
+# #!/bin/zsh
+# for k in $(git branch | perl -pe 's/^..//'); do echo -e `git show --pretty=format:"%Cgreen%ci %Cblue%cr%Creset" $k -- | head -n 1`\\t$k; done | sort -r
+
+def CommandLines(cmd_args, mapping=None):
+  stdin = stdout = stderr = subprocess.PIPE
+  process = subprocess.Popen(git_command, bufsize=1, stdin=stdin,
+                             stdout=stdout, stderr=stderr,
+                             shell=False,
+                             universal_newlines=True)
+  for line in iter(process.stdout.readline, ""):
+    out = line.rstrip("\n")
+    if mapping:
+      out = mapping(out)
+    yield out
+  (output, errors) = process.communicate()
+  exit_code = process.returncode
+  if errors:
+    raise GitCallError("ERROR running %s:\n%s" % (git_command,
+                                                  output + errors))
+  if exit_code:
+    raise GitCallError("Got return code %d from %s" % (exit_code,
+                                                       git_command))
+
+
+def GitLogLine(branch):
+
+
+def GitBranches():
+  """Run git branch.
+
+  Returns:
+    List of branches.
+  """
+  git_command = ["git", "branch", "--color=never"]
+  stdin = stdout = stderr = subprocess.PIPE
+  process = subprocess.Popen(git_command, bufsize=1, stdin=stdin,
+                             stdout=stdout, stderr=stderr,
+                             shell=False,
+                             universal_newlines=True)
+  branches = []
+  for line in iter(process.stdout.readline, ""):
+    branches.append(line.rstrip("\n")[2:])
+  (output, errors) = process.communicate()
+  exit_code = process.returncode
+  if errors:
+    raise GitCallError("ERROR running %s:\n%s" % (git_command,
+                                                  output + errors))
+  if exit_code:
+    raise GitCallError("Got return code %d from %s" % (exit_code,
+                                                       git_command))
+  return branches
+
+
+if __name__ == "__main__":
+  # print "About to run GitBranches()"
+  try:
+    branches = GitBranches()
+  except GitCallError as e:
+    print "Failed: %s" % str(e).rstrip("\n")
+    sys.exit(1)
+  for (i, b) in enumerate(branches):
+    print "%d: %s" % (i, b)
