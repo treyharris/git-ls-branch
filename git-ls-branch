@@ -24,6 +24,8 @@ PARSER.add_argument("--color", choices=["never", "auto", "always"],
                     "or auto.")
 ARGS = argparse.Namespace()
 
+CURRENT_BRANCH = None
+
 class GitCallError(Exception):
   pass
 
@@ -61,7 +63,10 @@ def GitLogLines(branches):
 
   for b in branches:
     date = CommandLines(git_command + [b]).next()
-    yield "%-65s %s" % (date, b)
+    current_marker = " "
+    if b == CURRENT_BRANCH:
+      current_marker = "*"
+    yield "%-65s %s %s" % (date, current_marker, b)
 
 def GitBranches():
   """Run git branch.
@@ -76,12 +81,18 @@ def GitBranches():
     git_command.append("-a")
 
   def extractBranch(line):
+    current = False
+    if line[0] == "*": # current branch, save it
+      current = True
     # remove spaces or '* '
     line = line[2:]
     # remove potential remote refs
     idx = line.find(" ->")
     if idx != -1:
       line = line[:idx]
+    if current:
+      global CURRENT_BRANCH
+      CURRENT_BRANCH = line
     return line
 
   branches = list(CommandLines(git_command, extractBranch))
