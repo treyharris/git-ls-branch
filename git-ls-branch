@@ -1,25 +1,19 @@
 #!/usr/bin/python
+"""Show git branches with the most-recently-modified date.
 
+"""
+import argparse
+from collections import Sequence
 import os
 import sys
 import subprocess
 
-sys.path.insert(0, os.getenv("GITPYTHONLIB","/Users/trey/homebrew/Cellar/git/1.8.2/lib/python2.7/site-packages"))
-
-from git_remote_helpers import util
-from git_remote_helpers.util import die, debug, warn
-
 class GitCallError(Exception):
   pass
 
-# #!/bin/zsh
-# for k in $(git branch | sed 's/^..//'); do echo -e `git log -1 --pretty=format:"%Cgreen%ci %Cblue%cr%Creset" $k --`\\t"$k";done | sort -r
-# #!/bin/zsh
-# for k in $(git branch | perl -pe 's/^..//'); do echo -e `git show --pretty=format:"%Cgreen%ci %Cblue%cr%Creset" $k -- | head -n 1`\\t$k; done | sort -r
-
 def CommandLines(cmd_args, mapping=None):
   stdin = stdout = stderr = subprocess.PIPE
-  process = subprocess.Popen(git_command, bufsize=1, stdin=stdin,
+  process = subprocess.Popen(cmd_args, bufsize=1, stdin=stdin,
                              stdout=stdout, stderr=stderr,
                              shell=False,
                              universal_newlines=True)
@@ -31,15 +25,23 @@ def CommandLines(cmd_args, mapping=None):
   (output, errors) = process.communicate()
   exit_code = process.returncode
   if errors:
-    raise GitCallError("ERROR running %s:\n%s" % (git_command,
+    raise GitCallError("ERROR running %s:\n%s" % (cmd_args,
                                                   output + errors))
   if exit_code:
     raise GitCallError("Got return code %d from %s" % (exit_code,
-                                                       git_command))
+                                                       cmd_args))
 
 
-def GitLogLine(branch):
+def GitLogLines(branches):
+  if not isinstance(branches, Sequence):
+    branches = [branches]
 
+  git_command = ["git", "log", "-1",
+                 "--pretty=format:%Cgreen%ci %Cblue%cr%Creset"]
+
+  for b in branches:
+    date = CommandLines(git_command + [b]).next()
+    yield "%-65s %s" % (date, b)
 
 def GitBranches():
   """Run git branch.
@@ -48,31 +50,15 @@ def GitBranches():
     List of branches.
   """
   git_command = ["git", "branch", "--color=never"]
-  stdin = stdout = stderr = subprocess.PIPE
-  process = subprocess.Popen(git_command, bufsize=1, stdin=stdin,
-                             stdout=stdout, stderr=stderr,
-                             shell=False,
-                             universal_newlines=True)
-  branches = []
-  for line in iter(process.stdout.readline, ""):
-    branches.append(line.rstrip("\n")[2:])
-  (output, errors) = process.communicate()
-  exit_code = process.returncode
-  if errors:
-    raise GitCallError("ERROR running %s:\n%s" % (git_command,
-                                                  output + errors))
-  if exit_code:
-    raise GitCallError("Got return code %d from %s" % (exit_code,
-                                                       git_command))
+  branches = list(CommandLines(git_command, lambda s: s[2:]))
   return branches
 
 
 if __name__ == "__main__":
-  # print "About to run GitBranches()"
   try:
     branches = GitBranches()
+    lines = list(GitLogLines(branches))
+    print "\n".join(sorted(lines, reverse=True))
   except GitCallError as e:
     print "Failed: %s" % str(e).rstrip("\n")
     sys.exit(1)
-  for (i, b) in enumerate(branches):
-    print "%d: %s" % (i, b)
