@@ -8,6 +8,22 @@ import os
 import sys
 import subprocess
 
+PARSER = argparse.ArgumentParser(description="Process some integers.")
+PARSER.add_argument("-r", "--remotes", action="store_true",
+                    help="List the remote-tracking branches.")
+PARSER.add_argument("-a", "--all", action="store_true",
+                    help="List both remote-tracking and local branches.")
+PARSER.add_argument("--no-color", "--nocolor", action="store_const",
+                    const="never", dest="color",
+                    help="Turn off branch colors, even when the "
+                    "configuration file gives the default to color output. "
+                    "Same as --color=never.")
+PARSER.add_argument("--color", choices=["never", "auto", "always"],
+                    metavar="{always, auto, never}",
+                    help="Color output. The value must be always, never, "
+                    "or auto.")
+ARGS = argparse.Namespace()
+
 class GitCallError(Exception):
   pass
 
@@ -36,8 +52,12 @@ def GitLogLines(branches):
   if not isinstance(branches, Sequence):
     branches = [branches]
 
+  if ARGS.color == "never":
+    output_format = "%ci %cr"
+  else:
+    output_format = "%Cgreen%ci %Cblue%cr%Creset"
   git_command = ["git", "log", "-1",
-                 "--pretty=format:%Cgreen%ci %Cblue%cr%Creset"]
+                 "--pretty=format:%s" % output_format]
 
   for b in branches:
     date = CommandLines(git_command + [b]).next()
@@ -50,11 +70,26 @@ def GitBranches():
     List of branches.
   """
   git_command = ["git", "branch", "--color=never"]
-  branches = list(CommandLines(git_command, lambda s: s[2:]))
+  if ARGS.remotes:
+    git_command.append("-r")
+  if ARGS.all:
+    git_command.append("-a")
+
+  def extractBranch(line):
+    # remove spaces or '* '
+    line = line[2:]
+    # remove potential remote refs
+    idx = line.find(" ->")
+    if idx != -1:
+      line = line[:idx]
+    return line
+
+  branches = list(CommandLines(git_command, extractBranch))
   return branches
 
 
 if __name__ == "__main__":
+  ARGS = PARSER.parse_args()
   try:
     branches = GitBranches()
     lines = list(GitLogLines(branches))
