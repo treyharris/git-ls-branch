@@ -62,7 +62,7 @@ def GitLogLines(branches):
                  "--pretty=format:%s" % output_format]
 
   for b in branches:
-    date = CommandLines(git_command + [b]).next()
+    date = CommandLines(git_command + [b, "--"]).next()
     current_marker = " "
     if b == CURRENT_BRANCH:
       current_marker = "*"
